@@ -1,0 +1,4 @@
+# NOTE: confirm this tag is current at build time. If the image pull fails,
+# bump it to a current home-assistant base-python tag (pattern: <py>-alpine<ver>).
+build_from:
+  aarch64: ghcr.io/home-assistant/aarch64-base-python:3.12-alpine3.20

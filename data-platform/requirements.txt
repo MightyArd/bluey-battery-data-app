@@ -1,0 +1,4 @@
+paho-mqtt>=2.0
+requests>=2.31
+influxdb-client>=1.40
+polars>=1.0
