@@ -1,4 +1,4 @@
-__pycache__/
+﻿__pycache__/
 *.py[cod]
 .venv/
 *.egg-info/
@@ -8,3 +8,4 @@ __pycache__/
 *.parquet
 state.json
 rclone.conf
+data-platform/tests/fixtures/sample_p5.zip
