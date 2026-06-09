@@ -1,5 +1,5 @@
-﻿name: Bluey Data Platform
-version: "0.2.1"
+name: Bluey Data Platform
+version: "0.3.0"
 slug: data_platform
 description: P5 ingestion, battery dispatch simulation, and 5-minute archive for Bluey.
 url: https://github.com/MightyArd/bluey-battery-data-app
@@ -14,5 +14,37 @@ services:
   - mqtt:need
 options:
   log_level: info
+  charge_window_start: "11:00"
+  charge_window_end: "14:00"
+  export_window_start: "18:00"
+  export_window_end: "21:00"
+  reserve_target_soc: 15
+  price_override_threshold: 500
+  export_limit_w: 500
+  soc_entity: sensor.goodwe_battery_soc
+  solar_entity: sensor.goodwe_pv_power_total
+  reserve_load_entity: sensor.goodwe_house_consumption
+  usable_capacity_kwh: 40.0
+  max_charge_kw: 6.5
+  soc_hard_min: 5
+  soc_hard_max: 100
+  influxdb_token: ""
+  timezone: Australia/Melbourne
 schema:
   log_level: list(trace|debug|info|notice|warning|error|fatal)?
+  charge_window_start: str
+  charge_window_end: str
+  export_window_start: str
+  export_window_end: str
+  reserve_target_soc: int
+  price_override_threshold: float
+  export_limit_w: int
+  soc_entity: str
+  solar_entity: str
+  reserve_load_entity: str
+  usable_capacity_kwh: float
+  max_charge_kw: float
+  soc_hard_min: int
+  soc_hard_max: int
+  influxdb_token: password?
+  timezone: str

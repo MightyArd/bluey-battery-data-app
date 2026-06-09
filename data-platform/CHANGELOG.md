@@ -1,4 +1,23 @@
-﻿# Changelog
+# Changelog
+
+## 0.3.0
+- Battery dispatch simulation: shadow-mode settle + decide loop running every
+  5-minute cycle after the P5 fetch.
+- Four new MQTT discovery entities: sensor.bluey_data_platform_simulation_soc,
+  simulation_planned_mode, simulation_settled_mode, simulation_grid_signed.
+- New modules: app/simulator.py (decide + settle logic), app/sources.py (HA API
+  + InfluxDB reads), app/state.py (durable state in /data/sim_state.json).
+- Simulation parameters configurable as add-on options with sensible defaults:
+  charge/export windows, reserve target, price override threshold, SOC limits,
+  battery capacity, export cap, entity names, InfluxDB token, timezone.
+- InfluxDB reads for period actuals (settle) and 7-day load/solar profile
+  (reserve floor + decide). Falls back gracefully when token is not configured.
+- Cold start seeds simulated SOC from actual battery SOC via HA Supervisor API.
+- Reserve floor is dynamic: SOC needed to cover expected load to next 11:00.
+- Unit tests: TestDecide (10 cases), TestSettle (8 cases), TestReserveFloor
+  (3 cases).
+- Bumped version to 0.3.0; updated config.yaml options/schema, run.sh, and
+  requirements.txt (added tzdata for Alpine timezone support).
 
 ## 0.2.0
 - P5 fetch-and-publish loop: every 5 minutes, fetch the AEMO P5MIN predispatch

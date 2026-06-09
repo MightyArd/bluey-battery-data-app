@@ -1,11 +1,26 @@
 #!/usr/bin/with-contenv bashio
 
-# Pull MQTT connection details from the Supervisor MQTT service.
 export MQTT_HOST="$(bashio::services mqtt 'host')"
 export MQTT_PORT="$(bashio::services mqtt 'port')"
 export MQTT_USER="$(bashio::services mqtt 'username')"
 export MQTT_PASSWORD="$(bashio::services mqtt 'password')"
 export LOG_LEVEL="$(bashio::config 'log_level')"
+export CHARGE_WINDOW_START="$(bashio::config 'charge_window_start')"
+export CHARGE_WINDOW_END="$(bashio::config 'charge_window_end')"
+export EXPORT_WINDOW_START="$(bashio::config 'export_window_start')"
+export EXPORT_WINDOW_END="$(bashio::config 'export_window_end')"
+export RESERVE_TARGET_SOC="$(bashio::config 'reserve_target_soc')"
+export PRICE_OVERRIDE_THRESHOLD="$(bashio::config 'price_override_threshold')"
+export EXPORT_LIMIT_W="$(bashio::config 'export_limit_w')"
+export SOC_ENTITY="$(bashio::config 'soc_entity')"
+export SOLAR_ENTITY="$(bashio::config 'solar_entity')"
+export RESERVE_LOAD_ENTITY="$(bashio::config 'reserve_load_entity')"
+export USABLE_CAPACITY_KWH="$(bashio::config 'usable_capacity_kwh')"
+export MAX_CHARGE_KW="$(bashio::config 'max_charge_kw')"
+export SOC_HARD_MIN="$(bashio::config 'soc_hard_min')"
+export SOC_HARD_MAX="$(bashio::config 'soc_hard_max')"
+export INFLUXDB_TOKEN="$(bashio::config 'influxdb_token')"
+export TIMEZONE="$(bashio::config 'timezone')"
 
-bashio::log.info "Starting Bluey Data Platform (MQTT ${MQTT_HOST}:${MQTT_PORT})"
+bashio::log.info "Starting Bluey Data Platform v0.3.0 (MQTT ${MQTT_HOST}:${MQTT_PORT})"
 exec python3 -m app.main

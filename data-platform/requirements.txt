@@ -1,5 +1,6 @@
-﻿paho-mqtt>=2.0
+paho-mqtt>=2.0
 requests>=2.31
 influxdb-client>=1.40
 polars>=1.0
 pytest>=8.0
+tzdata>=2024.1

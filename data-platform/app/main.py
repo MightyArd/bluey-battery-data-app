@@ -1,6 +1,6 @@
-﻿"""Bluey Data Platform - entry point.
+"""Bluey Data Platform - entry point.
 
-v0.2.0: 5-minute P5 fetch-and-publish loop aligned to AEMO dispatch intervals.
+v0.3.0: adds battery dispatch simulation after each P5 fetch cycle.
 """
 from __future__ import annotations
 
@@ -13,19 +13,17 @@ import paho.mqtt.client as mqtt
 
 from . import p5 as p5_mod
 from . import publisher
+from . import simulator
 from .settings import load as load_settings
 
 _HEARTBEAT_TOPIC = "bluey/data_platform/heartbeat"
-_VERSION = "0.2.0"
+_VERSION = "0.3.0"
 
-# Loop fires at the first minute-multiple-of-5 boundary after CYCLE_OFFSET_S
-# seconds into each 5-minute window. 120 s = :02, :07, :12... past the hour.
 _PERIOD_S = 300
 _CYCLE_OFFSET_S = 120
 
 
 def _next_wake(now: float) -> float:
-    """Return the next aligned wake time: next 5-minute boundary + offset."""
     base = math.ceil((now - _CYCLE_OFFSET_S) / _PERIOD_S) * _PERIOD_S + _CYCLE_OFFSET_S
     if base <= now:
         base += _PERIOD_S
@@ -61,6 +59,7 @@ def main() -> None:
     publisher.publish_discovery(client)
 
     last_run_dt = p5_mod.load_last_run(settings.data_dir)
+    last_p5_rrp: float | None = None
     log.info("Last processed P5 run: %s", last_run_dt or "none")
 
     while True:
@@ -72,9 +71,15 @@ def main() -> None:
             publisher.publish_p5(client, result)
             p5_mod.save_last_run(settings.data_dir, result.run_datetime)
             last_run_dt = result.run_datetime
-            log.info("Cycle complete: rrp=%.4f run=%s", result.rrp, result.run_datetime)
+            last_p5_rrp = result.rrp
+            log.info("P5 cycle complete: rrp=%.4f run=%s", result.rrp, result.run_datetime)
         else:
-            log.info("Cycle complete: no new P5 run")
+            log.info("P5 cycle complete: no new run")
+
+        try:
+            simulator.run_step(client, settings, last_p5_rrp)
+        except Exception as exc:
+            log.error("Simulation step failed: %s", exc, exc_info=True)
 
         wake = _next_wake(time.time())
         log.info("Next wake in %.0fs", wake - time.time())
