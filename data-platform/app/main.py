@@ -19,9 +19,9 @@ _HEARTBEAT_TOPIC = "bluey/data_platform/heartbeat"
 _VERSION = "0.2.0"
 
 # Loop fires at the first minute-multiple-of-5 boundary after CYCLE_OFFSET_S
-# seconds into each 5-minute window. 60 s gives AEMO time to publish the file.
+# seconds into each 5-minute window. 120 s = :02, :07, :12... past the hour.
 _PERIOD_S = 300
-_CYCLE_OFFSET_S = 60
+_CYCLE_OFFSET_S = 120
 
 
 def _next_wake(now: float) -> float:
