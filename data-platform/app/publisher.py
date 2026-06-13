@@ -13,7 +13,7 @@ log = logging.getLogger("bluey.publisher")
 _DEVICE = {
     "identifiers": ["bluey_data_platform"],
     "name": "Bluey Data Platform",
-    "model": "data-platform v0.4.1",
+    "model": "data-platform v0.4.2",
     "manufacturer": "Bluey",
 }
 

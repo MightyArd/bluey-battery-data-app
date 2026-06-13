@@ -1,5 +1,5 @@
 name: Bluey Data Platform
-version: "0.4.1"
+version: "0.4.2"
 slug: data_platform
 description: P5 ingestion, battery dispatch simulation, and 5-minute archive for Bluey.
 url: https://github.com/MightyArd/bluey-battery-data-app
@@ -21,7 +21,7 @@ options:
   reserve_target_soc: 15
   price_override_threshold: 500
   export_limit_w: 500
-  soc_entity: sensor.goodwe_battery_soc
+  soc_entity: sensor.goodwe_battery_state_of_charge
   solar_entity: sensor.goodwe_pv_power_total
   reserve_load_entity: sensor.goodwe_house_consumption
   usable_capacity_kwh: 40.0

@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.4.2
+- Corrected the battery SOC entity name, which was assumed and did not exist:
+  - Simulation soc_entity option default is now
+    sensor.goodwe_battery_state_of_charge.
+  - The archive battery_soc column reads goodwe_battery_state_of_charge (mean).
+- Corrected the app-entity InfluxDB names: Home Assistant logs this add-on's own
+  entities under bluey_data_platform_* (device name plus entity name), so the
+  archive now reads bluey_data_platform_p5_price_forecast and
+  bluey_data_platform_simulation_* rather than the unprefixed names.
+- P5 run id: the archive reads the AEMO RUN_DATETIME from the run_id_str field on
+  bluey_data_platform_p5_price_forecast (the price remains the value field).
+- Persisted simulation state is now schema-versioned and bumped to 2, so the next
+  run discards the old state (which had been seeded from the non-existent SOC
+  entity) and re-seeds the counterfactual SOC from the corrected actual SOC.
+
 ## 0.4.1
 - Corrected the archived energy-counter selections (no behaviour change otherwise):
   - Battery RTE inputs now use the cumulative lifetime counters

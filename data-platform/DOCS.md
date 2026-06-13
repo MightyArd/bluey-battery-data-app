@@ -9,7 +9,7 @@
 3. Ensure the Mosquitto broker add-on is running (this add-on requires MQTT).
 4. Start the add-on and check the log.
 
-## Current behaviour (v0.4.1)
+## Current behaviour (v0.4.2)
 
 Every 5 minutes (aligned to AEMO dispatch boundaries, +2 min offset):
 
@@ -98,7 +98,7 @@ The `rclone` config is generated at runtime from the options below into
 | `reserve_target_soc` | 15 | % SOC to hold at the start of each charge window |
 | `price_override_threshold` | 500 | $/MWh above which the battery exports |
 | `export_limit_w` | 500 | W maximum grid export (DNSP cap) |
-| `soc_entity` | sensor.goodwe_battery_soc | HA entity for actual battery SOC |
+| `soc_entity` | sensor.goodwe_battery_state_of_charge | HA entity for actual battery SOC |
 | `solar_entity` | sensor.goodwe_pv_power_total | HA entity for solar generation |
 | `reserve_load_entity` | sensor.goodwe_house_consumption | HA entity for house load |
 | `usable_capacity_kwh` | 40.0 | Usable battery capacity |
@@ -122,10 +122,15 @@ The `rclone` config is generated at runtime from the options below into
 
 - After deploy, add `sensor.bluey_data_platform_simulation_*` to the InfluxDB
   include globs in your Home Assistant InfluxDB integration configuration.
-- The InfluxDB entity_id tag is assumed to be the object_id (no domain prefix,
-  e.g. `goodwe_house_consumption` not `sensor.goodwe_house_consumption`). Adjust
-  the `soc_entity`, `solar_entity`, and `reserve_load_entity` options to match
-  your InfluxDB schema if needed.
-- `simulation_grid_signed` uses positive=import, negative=export. This is
-  inverted relative to the GoodWe native sensor. Verify and align when building
-  the archive increment.
+- The InfluxDB entity_id tag is the object_id (no domain prefix, e.g.
+  `goodwe_house_consumption` not `sensor.goodwe_house_consumption`). Adjust the
+  `soc_entity`, `solar_entity`, and `reserve_load_entity` options to match your
+  InfluxDB schema if needed.
+- This add-on's own published entities are logged by InfluxDB under
+  `bluey_data_platform_*` (Home Assistant derives the entity_id from the device
+  name plus the entity name). The archive reads the P5 price from the `value`
+  field and the AEMO run id from the `run_id_str` field on
+  `bluey_data_platform_p5_price_forecast`.
+- `simulation_grid_signed` uses positive=import, negative=export, which is
+  inverted relative to the GoodWe native sensor. The archive keeps this
+  convention, matching `grid_import_power`/`grid_export_power`.

@@ -84,7 +84,7 @@ def load() -> Settings:
         max_charge_kw=float(os.environ.get("MAX_CHARGE_KW", "6.5")),
         soc_hard_min=int(os.environ.get("SOC_HARD_MIN", "5")),
         soc_hard_max=int(os.environ.get("SOC_HARD_MAX", "100")),
-        soc_entity=os.environ.get("SOC_ENTITY", "sensor.goodwe_battery_soc"),
+        soc_entity=os.environ.get("SOC_ENTITY", "sensor.goodwe_battery_state_of_charge"),
         solar_entity=os.environ.get("SOLAR_ENTITY", "sensor.goodwe_pv_power_total"),
         reserve_load_entity=os.environ.get("RESERVE_LOAD_ENTITY", "sensor.goodwe_house_consumption"),
         influxdb_token=os.environ.get("INFLUXDB_TOKEN", ""),

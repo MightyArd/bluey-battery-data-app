@@ -55,7 +55,7 @@ MEASURED_SPECS: tuple[VarSpec, ...] = (
     VarSpec("ev_power", "ev_power", "mean"),
     VarSpec("non_ev_load_power", "non_ev_load_power", "mean"),
     # SOC, mean
-    VarSpec("battery_soc", "goodwe_battery_soc", "mean"),
+    VarSpec("battery_soc", "goodwe_battery_state_of_charge", "mean"),
     # Categorical, last
     VarSpec("goodwe_battery_mode", "goodwe_battery_mode", "last"),
     # Energy counters, last (import and export kept split, never netted). Grid energy
@@ -76,15 +76,18 @@ MEASURED_SPECS: tuple[VarSpec, ...] = (
     VarSpec("goodwe_total_battery_discharge", "goodwe_total_battery_discharge", "last"),
 )
 
-# App entities (published by this add-on via MQTT discovery). These object_ids match
-# what the discovery configs in publisher.py actually create in HA.
+# App entities (published by this add-on via MQTT discovery). HA derives the
+# InfluxDB entity_id from the device name plus the entity name, so every app entity
+# is prefixed bluey_data_platform_ (for example the P5 sensor is
+# bluey_data_platform_p5_price_forecast). For the P5 sensor the price is the state
+# (the "value" field); the AEMO RUN_DATETIME string is logged as the run_id_str field.
 APP_SPECS: tuple[VarSpec, ...] = (
-    VarSpec("p5_price_forecast", "p5_price_forecast", "last"),
-    VarSpec("p5_run_id", "p5_price_forecast", "last", field="run_id"),
-    VarSpec("simulation_soc", "simulation_soc", "mean"),
-    VarSpec("simulation_planned_mode", "simulation_planned_mode", "last"),
-    VarSpec("simulation_settled_mode", "simulation_settled_mode", "last"),
-    VarSpec("simulation_grid_signed", "simulation_grid_signed", "mean"),
+    VarSpec("p5_price_forecast", "bluey_data_platform_p5_price_forecast", "last"),
+    VarSpec("p5_run_id", "bluey_data_platform_p5_price_forecast", "last", field="run_id_str"),
+    VarSpec("simulation_soc", "bluey_data_platform_simulation_soc", "mean"),
+    VarSpec("simulation_planned_mode", "bluey_data_platform_simulation_planned_mode", "last"),
+    VarSpec("simulation_settled_mode", "bluey_data_platform_simulation_settled_mode", "last"),
+    VarSpec("simulation_grid_signed", "bluey_data_platform_simulation_grid_signed", "mean"),
 )
 
 

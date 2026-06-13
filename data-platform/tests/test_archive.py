@@ -146,6 +146,27 @@ class TestSpecsAndNaming:
         assert "goodwe_total_energy_export" not in entities
         assert not any(e.startswith("goodwe_meter_2_") for e in entities)
 
+    def test_battery_soc_uses_state_of_charge_entity(self):
+        spec = self._spec("battery_soc")
+        assert spec.entity_id == "goodwe_battery_state_of_charge"
+        assert spec.agg == "mean"
+
+    def test_app_entities_use_device_prefixed_names(self):
+        app_cols = (
+            "p5_price_forecast", "p5_run_id", "simulation_soc",
+            "simulation_planned_mode", "simulation_settled_mode", "simulation_grid_signed",
+        )
+        for col in app_cols:
+            assert self._spec(col).entity_id.startswith("bluey_data_platform_")
+
+    def test_p5_run_id_reads_run_id_str_field(self):
+        price = self._spec("p5_price_forecast")
+        run_id = self._spec("p5_run_id")
+        assert price.entity_id == "bluey_data_platform_p5_price_forecast"
+        assert price.field == "value"  # price is the state
+        assert run_id.entity_id == "bluey_data_platform_p5_price_forecast"
+        assert run_id.field == "run_id_str"  # AEMO RUN_DATETIME string
+
     def test_filename_and_partition(self):
         d = date(2026, 6, 9)
         assert daily_filename(d) == "energy_5min_2026-06-09.parquet"
