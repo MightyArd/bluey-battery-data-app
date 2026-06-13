@@ -1,5 +1,30 @@
 # Changelog
 
+## 0.5.0
+- Force-backup button: a momentary MQTT button entity
+  (button.bluey_data_platform_run_archive, friendly name "Force backup") under the
+  existing Bluey Data Platform device. Pressing it runs the same daily archive the
+  timer runs (rollup of the previous full local day, push to NAS and B2, checksum
+  verification, backup-health timestamp updates).
+- The press is routed safely: the MQTT callback only sets a thread-safe flag; the
+  archive runs in the main loop, never on paho's network thread, so a multi-second
+  run cannot stall the heartbeat or trip an MQTT disconnect. The single-threaded
+  loop serialises manual and scheduled runs, so a press and the daily timer can
+  never run concurrently.
+- A manual press is purely additive: it does not touch the daily-run bookkeeping
+  (last_archive_date), so it neither suppresses nor is suppressed by the scheduled
+  run. A press while the NAS is off completes the B2 leg and skips the NAS leg
+  cleanly, exactly like any run.
+- The command subscription is re-established on every MQTT (re)connect, so a broker
+  restart keeps the button live.
+- Unit tests: trigger one-shot semantics, callback-sets-flag-not-run, bookkeeping
+  isolation, scheduled-once-per-day, press-and-schedule serialisation, and button
+  discovery config (14 cases).
+- Bumped version to 0.5.0; updated config.yaml, DOCS.md, and the device model.
+- Refactored the paho import in publisher.py and main.py behind TYPE_CHECKING (the
+  pattern archive.py already uses) so the routing logic is unit-testable without
+  the paho dependency; runtime behaviour is unchanged.
+
 ## 0.4.2
 - Corrected the battery SOC entity name, which was assumed and did not exist:
   - Simulation soc_entity option default is now

@@ -9,7 +9,7 @@
 3. Ensure the Mosquitto broker add-on is running (this add-on requires MQTT).
 4. Start the add-on and check the log.
 
-## Current behaviour (v0.4.2)
+## Current behaviour (v0.5.0)
 
 Every 5 minutes (aligned to AEMO dispatch boundaries, +2 min offset):
 
@@ -85,6 +85,31 @@ AC-to-AC RTE is not available from these sensors.
 
 The `rclone` config is generated at runtime from the options below into
 `/data/rclone.conf` (SMB passwords obscured); no secrets are committed.
+
+### Force backup button (v0.5.0)
+
+The add-on publishes a momentary button,
+`button.bluey_data_platform_run_archive` (friendly name "Force backup"), grouped
+under the Bluey Data Platform device. Pressing it runs the same archive the daily
+timer runs: rollup of the previous full local day, push to the NAS and B2,
+checksum verification, and the backup-health timestamp updates. There is no new
+archive logic; the press reuses the daily path as-is.
+
+The press is handled safely. The MQTT callback only sets a thread-safe flag; the
+archive itself runs in the main loop, never on the MQTT network thread, so a run
+that takes several seconds cannot stall the heartbeat or trip an MQTT disconnect.
+The single-threaded loop serialises manual and scheduled runs, so a press and the
+03:00-ish daily timer can never run at the same time.
+
+A press is purely additive: it does not change the daily-run bookkeeping, so it
+neither skips the scheduled run nor is skipped because of it. A press while the
+NAS is off (or `nas_share` is unset) completes the B2 leg and cleanly skips the
+NAS leg, exactly like any other run. The press is logged distinctly from the
+scheduled run (button pressed, manual run starting, manual run finished).
+
+There is no option for the button; it is always present. The "press automatically
+when the NAS comes back online" behaviour belongs in a Home Assistant automation,
+not in this add-on.
 
 ## Options
 

@@ -3,17 +3,19 @@ from __future__ import annotations
 
 import json
 import logging
-
-import paho.mqtt.client as mqtt
+from typing import TYPE_CHECKING
 
 from .p5 import P5Result
+
+if TYPE_CHECKING:
+    import paho.mqtt.client as mqtt
 
 log = logging.getLogger("bluey.publisher")
 
 _DEVICE = {
     "identifiers": ["bluey_data_platform"],
     "name": "Bluey Data Platform",
-    "model": "data-platform v0.4.2",
+    "model": "data-platform v0.5.0",
     "manufacturer": "Bluey",
 }
 
@@ -36,6 +38,13 @@ _DISCOVERY_BACKUP_CLOUD = "homeassistant/sensor/bluey_backup_cloud_last_success/
 _STATE_BACKUP_NAS = "bluey/data_platform/backup_nas_last_success/state"
 _STATE_BACKUP_CLOUD = "bluey/data_platform/backup_cloud_last_success/state"
 
+# Force-backup button. A momentary HA button: pressing it publishes the press
+# payload to the command topic, which the main loop turns into one archive run.
+# The command topic is public so main.py can subscribe to it.
+_DISCOVERY_BUTTON = "homeassistant/button/bluey_run_archive/config"
+RUN_ARCHIVE_COMMAND_TOPIC = "bluey/data_platform/run_archive/command"
+RUN_ARCHIVE_PRESS_PAYLOAD = "PRESS"
+
 _SIM_MODES = ["charge", "discharge", "self_consume", "idle"]
 
 
@@ -44,6 +53,7 @@ def publish_discovery(client: mqtt.Client) -> None:
     _publish_p5_discovery(client)
     _publish_simulation_discovery(client)
     _publish_backup_discovery(client)
+    _publish_button_discovery(client)
 
 
 def _publish_p5_discovery(client: mqtt.Client) -> None:
@@ -138,6 +148,30 @@ def _publish_backup_discovery(client: mqtt.Client) -> None:
     }
     client.publish(_DISCOVERY_BACKUP_CLOUD, json.dumps(cloud_cfg), retain=True)
     log.debug("Backup health discovery published")
+
+
+def _publish_button_discovery(client: mqtt.Client) -> None:
+    """Publish the retained discovery config for the Force backup button.
+
+    object_id "run_archive" under the "Bluey Data Platform" device yields the
+    entity_id button.bluey_data_platform_run_archive, while the friendly name stays
+    "Force backup". availability mirrors the other entities (online while the
+    heartbeat says alive).
+    """
+    avail = {"topic": _HEARTBEAT, "value_template": "{{ 'online' if value_json.status == 'alive' else 'offline' }}"}
+
+    button_cfg = {
+        "name": "Force backup",
+        "object_id": "run_archive",
+        "unique_id": "bluey_run_archive",
+        "command_topic": RUN_ARCHIVE_COMMAND_TOPIC,
+        "payload_press": RUN_ARCHIVE_PRESS_PAYLOAD,
+        "icon": "mdi:cloud-upload",
+        "availability": [avail],
+        "device": _DEVICE,
+    }
+    client.publish(_DISCOVERY_BUTTON, json.dumps(button_cfg), retain=True)
+    log.debug("Force-backup button discovery published")
 
 
 def publish_backup_health(client: mqtt.Client, dest: str, ts_iso: str) -> None:
