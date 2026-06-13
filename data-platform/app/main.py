@@ -1,6 +1,6 @@
 """Bluey Data Platform - entry point.
 
-v0.3.0: adds battery dispatch simulation after each P5 fetch cycle.
+v0.4.0: adds the once-a-day archive (rollup to Parquet, push to NAS and B2).
 """
 from __future__ import annotations
 
@@ -8,16 +8,19 @@ import json
 import logging
 import math
 import time
+from datetime import date, datetime
+from zoneinfo import ZoneInfo
 
 import paho.mqtt.client as mqtt
 
+from . import archive as archive_mod
 from . import p5 as p5_mod
 from . import publisher
 from . import simulator
 from .settings import load as load_settings
 
 _HEARTBEAT_TOPIC = "bluey/data_platform/heartbeat"
-_VERSION = "0.3.0"
+_VERSION = "0.4.0"
 
 _PERIOD_S = 300
 _CYCLE_OFFSET_S = 120
@@ -60,7 +63,11 @@ def main() -> None:
 
     last_run_dt = p5_mod.load_last_run(settings.data_dir)
     last_p5_rrp: float | None = None
+    last_archive_date: date | None = None
+    tz = ZoneInfo(settings.timezone)
     log.info("Last processed P5 run: %s", last_run_dt or "none")
+    log.info("Daily archive scheduled for %02d:%02d %s",
+             settings.archive_hour, settings.archive_minute, settings.timezone)
 
     while True:
         hb = json.dumps({"ts": round(time.time()), "status": "alive", "version": _VERSION})
@@ -80,6 +87,17 @@ def main() -> None:
             simulator.run_step(client, settings, last_p5_rrp)
         except Exception as exc:
             log.error("Simulation step failed: %s", exc, exc_info=True)
+
+        now_local = datetime.now(tz)
+        after_time = (now_local.hour, now_local.minute) >= (
+            settings.archive_hour, settings.archive_minute
+        )
+        if after_time and last_archive_date != now_local.date():
+            try:
+                archive_mod.run_archive(client, settings)
+            except Exception as exc:
+                log.error("Daily archive failed: %s", exc, exc_info=True)
+            last_archive_date = now_local.date()
 
         wake = _next_wake(time.time())
         log.info("Next wake in %.0fs", wake - time.time())

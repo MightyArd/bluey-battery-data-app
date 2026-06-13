@@ -9,7 +9,7 @@
 3. Ensure the Mosquitto broker add-on is running (this add-on requires MQTT).
 4. Start the add-on and check the log.
 
-## Current behaviour (v0.3.0)
+## Current behaviour (v0.4.0)
 
 Every 5 minutes (aligned to AEMO dispatch boundaries, +2 min offset):
 
@@ -52,6 +52,32 @@ reserve_floor_soc = reserve_target_soc
 
 Derived from the trailing 7-day load average by time-of-day.
 
+### Daily archive (v0.4.0)
+
+Once a day, at `archive_time` (default 00:30 local), the add-on archives the
+previous full local day:
+
+1. Queries InfluxDB for every archived variable over the day.
+2. Rolls each up to 5-minute resolution: mean for instantaneous quantities
+   (power, SOC), last for cumulative kWh counters and categorical states; P5 and
+   simulation values are taken as-is. Every 5-minute bucket is forward-filled, so
+   sensors that sit flat (grid power in particular) leave no gaps.
+3. Writes a Parquet file `energy_5min_YYYY-MM-DD.parquet` to `/data/archive/`.
+4. Pushes it to the Synology NAS (SMB) and Backblaze B2 (S3 backend) with `rclone`,
+   each verified by a downloaded-checksum comparison after transfer.
+5. Publishes `sensor.bluey_data_platform_backup_nas_last_success` and
+   `..._backup_cloud_last_success` timestamps, set only after a verified push.
+
+Destinations are independent: if one fails (for example B2 is not yet configured)
+the other still completes and reports, and the loop never crashes. The cloud leg is
+skipped silently until the B2 options are set. Grid power is archived as separate
+`grid_import_power` and `grid_export_power` columns, derived from the signed grid
+meter. Battery round-trip-efficiency energy counters are auto-detected in the `kWh`
+measurement and included when present.
+
+The `rclone` config is generated at runtime from the options below into
+`/data/rclone.conf` (SMB passwords obscured); no secrets are committed.
+
 ## Options
 
 | Option | Default | Description |
@@ -73,6 +99,16 @@ Derived from the trailing 7-day load average by time-of-day.
 | `soc_hard_max` | 100 | % hard SOC ceiling |
 | `influxdb_token` | (empty) | InfluxDB API token; simulation uses actuals if set |
 | `timezone` | Australia/Melbourne | IANA timezone for window evaluation |
+| `archive_time` | 00:30 | Local time, HH:MM, for the daily archive run |
+| `nas_host` | 192.168.50.214 | Synology SMB host |
+| `nas_share` | (empty) | SMB share name; NAS push is skipped when empty |
+| `nas_path` | energy-archive | Target folder within the share (also the B2 key prefix) |
+| `nas_user` | (empty) | SMB username |
+| `nas_password` | (empty) | SMB password (obscured into /data/rclone.conf) |
+| `b2_bucket` | (empty) | Backblaze B2 bucket; cloud push is skipped when empty |
+| `b2_key_id` | (empty) | B2 application key id |
+| `b2_key` | (empty) | B2 application key |
+| `b2_endpoint` | (empty) | B2 S3 endpoint, e.g. s3.us-west-004.backblazeb2.com |
 
 ## Notes
 

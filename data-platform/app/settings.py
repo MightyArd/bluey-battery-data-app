@@ -40,6 +40,20 @@ class Settings:
     influxdb_token: str
     # Timezone
     timezone: str
+    # Daily archive
+    archive_hour: int
+    archive_minute: int
+    # Synology NAS (SMB) destination
+    nas_host: str
+    nas_share: str
+    nas_path: str
+    nas_user: str
+    nas_password: str
+    # Backblaze B2 (S3-compatible) destination
+    b2_bucket: str
+    b2_key_id: str
+    b2_key: str
+    b2_endpoint: str
 
 
 def load() -> Settings:
@@ -47,6 +61,7 @@ def load() -> Settings:
     cwe_h, cwe_m = _parse_hm(os.environ.get("CHARGE_WINDOW_END", "14:00"))
     ews_h, ews_m = _parse_hm(os.environ.get("EXPORT_WINDOW_START", "18:00"))
     ewe_h, ewe_m = _parse_hm(os.environ.get("EXPORT_WINDOW_END", "21:00"))
+    arch_h, arch_m = _parse_hm(os.environ.get("ARCHIVE_TIME", "00:30"))
     return Settings(
         mqtt_host=os.environ.get("MQTT_HOST", "core-mosquitto"),
         mqtt_port=int(os.environ.get("MQTT_PORT", "1883")),
@@ -74,4 +89,15 @@ def load() -> Settings:
         reserve_load_entity=os.environ.get("RESERVE_LOAD_ENTITY", "sensor.goodwe_house_consumption"),
         influxdb_token=os.environ.get("INFLUXDB_TOKEN", ""),
         timezone=os.environ.get("TIMEZONE", "Australia/Melbourne"),
+        archive_hour=arch_h,
+        archive_minute=arch_m,
+        nas_host=os.environ.get("NAS_HOST", "192.168.50.214"),
+        nas_share=os.environ.get("NAS_SHARE", ""),
+        nas_path=os.environ.get("NAS_PATH", "energy-archive"),
+        nas_user=os.environ.get("NAS_USER", ""),
+        nas_password=os.environ.get("NAS_PASSWORD", ""),
+        b2_bucket=os.environ.get("B2_BUCKET", ""),
+        b2_key_id=os.environ.get("B2_KEY_ID", ""),
+        b2_key=os.environ.get("B2_KEY", ""),
+        b2_endpoint=os.environ.get("B2_ENDPOINT", ""),
     )

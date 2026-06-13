@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import logging
 from collections import defaultdict
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 
 import requests
@@ -19,6 +19,10 @@ _INFLUX_BUCKET = "home_assistant"
 def _object_id(entity_id: str) -> str:
     """Strip domain prefix: sensor.foo -> foo (matches HA InfluxDB default storage)."""
     return entity_id.split(".", 1)[-1]
+
+
+def _iso(dt: datetime) -> str:
+    return dt.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 def read_soc(soc_entity: str, supervisor_token: str) -> float | None:
@@ -135,3 +139,82 @@ def read_load_profile(
         _flux_profile(influx_token, load_entity, tz, days),
         _flux_profile(influx_token, solar_entity, tz, days),
     )
+
+
+def read_raw_series(
+    influx_token: str,
+    entity_id: str,
+    start: datetime,
+    stop: datetime,
+    field: str = "value",
+    seed_lookback_days: int = 30,
+) -> list[tuple[datetime, "float | str"]]:
+    """Raw points for one entity over [start, stop), plus one seed point before start.
+
+    Returns a time-sorted list of (utc_datetime, value). The seed point is the last
+    value strictly before `start`, so a sensor that has sat flat since before the
+    window still has a value to forward-fill from. Values are returned untouched
+    (float for numeric sensors, str for categorical states); the caller rolls them
+    up. Returns an empty list if InfluxDB is unreachable.
+    """
+    from influxdb_client import InfluxDBClient  # type: ignore[import]
+
+    oid = _object_id(entity_id)
+    flt = f'|> filter(fn: (r) => r["entity_id"] == "{oid}" and r["_field"] == "{field}")'
+    base = f'from(bucket: "{_INFLUX_BUCKET}")'
+    q_seed = (
+        f"{base}"
+        f'  |> range(start: {_iso(start - timedelta(days=seed_lookback_days))}, stop: {_iso(start)})'
+        f"  {flt}"
+        f"  |> last()"
+    )
+    q_main = (
+        f"{base}"
+        f"  |> range(start: {_iso(start)}, stop: {_iso(stop)})"
+        f"  {flt}"
+    )
+    records: list[tuple[datetime, float | str]] = []
+    try:
+        with InfluxDBClient(url=_INFLUX_URL, token=influx_token, org=_INFLUX_ORG) as c:
+            api = c.query_api()
+            for q in (q_seed, q_main):
+                for table in api.query(q):
+                    for rec in table.records:
+                        v = rec.get_value()
+                        if v is not None:
+                            records.append((rec.get_time(), v))
+    except Exception as exc:
+        log.warning("InfluxDB raw read failed (%s, field=%s): %s", entity_id, field, exc)
+        return []
+    records.sort(key=lambda r: r[0])
+    return records
+
+
+def discover_rte_counters(influx_token: str) -> list[str]:
+    """Find battery charge/discharge energy counters in the kWh measurement.
+
+    Returns the matching entity_id tag values (object_ids), or an empty list if
+    none exist or InfluxDB is unreachable. Never synthesises counters.
+    """
+    from influxdb_client import InfluxDBClient  # type: ignore[import]
+
+    q = (
+        'import "influxdata/influxdb/schema"\n'
+        f'schema.measurementTagValues(bucket: "{_INFLUX_BUCKET}", '
+        f'measurement: "kWh", tag: "entity_id")'
+    )
+    out: list[str] = []
+    try:
+        with InfluxDBClient(url=_INFLUX_URL, token=influx_token, org=_INFLUX_ORG) as c:
+            for table in c.query_api().query(q):
+                for rec in table.records:
+                    name = str(rec.get_value())
+                    low = name.lower()
+                    if "battery" in low and "energy" in low and (
+                        "charge" in low or "discharge" in low
+                    ):
+                        out.append(name)
+    except Exception as exc:
+        log.warning("InfluxDB RTE counter discovery failed: %s", exc)
+        return []
+    return sorted(set(out))

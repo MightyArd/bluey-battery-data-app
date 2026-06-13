@@ -1,5 +1,5 @@
 name: Bluey Data Platform
-version: "0.3.0"
+version: "0.4.0"
 slug: data_platform
 description: P5 ingestion, battery dispatch simulation, and 5-minute archive for Bluey.
 url: https://github.com/MightyArd/bluey-battery-data-app
@@ -30,6 +30,16 @@ options:
   soc_hard_max: 100
   influxdb_token: ""
   timezone: Australia/Melbourne
+  archive_time: "00:30"
+  nas_host: 192.168.50.214
+  nas_share: ""
+  nas_path: energy-archive
+  nas_user: ""
+  nas_password: ""
+  b2_bucket: ""
+  b2_key_id: ""
+  b2_key: ""
+  b2_endpoint: ""
 schema:
   log_level: list(trace|debug|info|notice|warning|error|fatal)?
   charge_window_start: str
@@ -48,3 +58,13 @@ schema:
   soc_hard_max: int
   influxdb_token: password?
   timezone: str
+  archive_time: str
+  nas_host: str
+  nas_share: str?
+  nas_path: str
+  nas_user: str?
+  nas_password: password?
+  b2_bucket: str?
+  b2_key_id: str?
+  b2_key: password?
+  b2_endpoint: str?

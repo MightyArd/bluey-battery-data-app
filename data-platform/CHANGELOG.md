@@ -1,5 +1,32 @@
 # Changelog
 
+## 0.4.0
+- Daily archive: once a day (default 00:30 local) query InfluxDB for the previous
+  full local day, roll up to 5-minute resolution, write Parquet, and push the file
+  to the Synology NAS and Backblaze B2, each verified by checksum.
+- Rollup rules: mean for instantaneous quantities (power, SOC), last for
+  cumulative kWh counters and categorical states; P5 and simulation values taken
+  as-is. Every 5-minute bucket is forward-filled so flat sensors (grid power in
+  particular) leave no gaps.
+- Grid power is now archived as separate grid_import_power and grid_export_power
+  columns, derived from the signed grid meter, so a window spanning both
+  directions keeps a sensible mean in each.
+- Round-trip efficiency counters are auto-detected in the kWh measurement and
+  included when present; their absence is logged, never synthesised.
+- Dual rclone push from Bluey: NAS over SMB and B2 over the S3 backend, with the
+  cloud leg skipped gracefully when B2 options are unset. A failure of one
+  destination still completes the other; the loop never crashes.
+- Two backup-health timestamp sensors (backup_nas_last_success,
+  backup_cloud_last_success) published only after a verified push.
+- rclone config is generated at runtime from add-on options into /data/rclone.conf
+  with SMB passwords obscured; no secrets are committed.
+- New module: app/archive.py (pure rollup, Parquet write, dual push, health).
+  sources.py gains raw-series reads with a forward-fill seed and RTE counter
+  discovery. New add-on options for archive time and the two destinations.
+- Unit tests: bucketing, mean-vs-last, forward-fill across flat and gappy series,
+  grid split, RTE include/omit, and filename/partition logic (13 cases).
+- Bumped version to 0.4.0; updated config.yaml, run.sh, DOCS.md, and CLAUDE.md.
+
 ## 0.3.0
 - Battery dispatch simulation: shadow-mode settle + decide loop running every
   5-minute cycle after the P5 fetch.

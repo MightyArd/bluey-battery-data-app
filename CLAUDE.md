@@ -70,7 +70,8 @@ All scalar time-series. Rollup rule: mean for instantaneous quantities (power,
 SOC, temperature), last for cumulative kWh counters and categorical states. P5
 and simulation values are 5-minute-native, so stored as-is.
 
-- Measured: `grid_signed_power`, `battery_signed_power`, battery SOC,
+- Measured: `grid_import_power`, `grid_export_power` (stored split, never netted,
+  derived from the signed grid meter), `battery_signed_power`, battery SOC,
   `goodwe_battery_mode`, `goodwe_pv_power_total`, `goodwe_house_consumption`,
   `ev_power`, `non_ev_load_power`. Energy counters: grid import, grid export
   (kept split, never netted), `goodwe_total_load`, PV generation,

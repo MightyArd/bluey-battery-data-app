@@ -13,7 +13,7 @@ log = logging.getLogger("bluey.publisher")
 _DEVICE = {
     "identifiers": ["bluey_data_platform"],
     "name": "Bluey Data Platform",
-    "model": "data-platform v0.3.0",
+    "model": "data-platform v0.4.0",
     "manufacturer": "Bluey",
 }
 
@@ -31,6 +31,11 @@ _STATE_SIM_PLANNED = "bluey/data_platform/simulation_planned_mode/state"
 _STATE_SIM_SETTLED = "bluey/data_platform/simulation_settled_mode/state"
 _STATE_SIM_GRID = "bluey/data_platform/simulation_grid_signed/state"
 
+_DISCOVERY_BACKUP_NAS = "homeassistant/sensor/bluey_backup_nas_last_success/config"
+_DISCOVERY_BACKUP_CLOUD = "homeassistant/sensor/bluey_backup_cloud_last_success/config"
+_STATE_BACKUP_NAS = "bluey/data_platform/backup_nas_last_success/state"
+_STATE_BACKUP_CLOUD = "bluey/data_platform/backup_cloud_last_success/state"
+
 _SIM_MODES = ["charge", "discharge", "self_consume", "idle"]
 
 
@@ -38,6 +43,7 @@ def publish_discovery(client: mqtt.Client) -> None:
     """Publish retained MQTT discovery configs for all entities."""
     _publish_p5_discovery(client)
     _publish_simulation_discovery(client)
+    _publish_backup_discovery(client)
 
 
 def _publish_p5_discovery(client: mqtt.Client) -> None:
@@ -107,6 +113,41 @@ def _publish_simulation_discovery(client: mqtt.Client) -> None:
     }
     client.publish(_DISCOVERY_SIM_GRID, json.dumps(grid_cfg), retain=True)
     log.debug("Simulation discovery published")
+
+
+def _publish_backup_discovery(client: mqtt.Client) -> None:
+    avail = {"topic": _HEARTBEAT, "value_template": "{{ 'online' if value_json.status == 'alive' else 'offline' }}"}
+
+    nas_cfg = {
+        "name": "Backup NAS Last Success",
+        "unique_id": "bluey_backup_nas_last_success",
+        "device_class": "timestamp",
+        "state_topic": _STATE_BACKUP_NAS,
+        "availability": [avail],
+        "device": _DEVICE,
+    }
+    client.publish(_DISCOVERY_BACKUP_NAS, json.dumps(nas_cfg), retain=True)
+
+    cloud_cfg = {
+        "name": "Backup Cloud Last Success",
+        "unique_id": "bluey_backup_cloud_last_success",
+        "device_class": "timestamp",
+        "state_topic": _STATE_BACKUP_CLOUD,
+        "availability": [avail],
+        "device": _DEVICE,
+    }
+    client.publish(_DISCOVERY_BACKUP_CLOUD, json.dumps(cloud_cfg), retain=True)
+    log.debug("Backup health discovery published")
+
+
+def publish_backup_health(client: mqtt.Client, dest: str, ts_iso: str) -> None:
+    """Publish a backup-health timestamp for a destination after a verified push.
+
+    `dest` is "nas" or "cloud"; `ts_iso` is an ISO8601 timestamp.
+    """
+    topic = _STATE_BACKUP_NAS if dest == "nas" else _STATE_BACKUP_CLOUD
+    client.publish(topic, ts_iso, retain=True)
+    log.info("Backup health published: dest=%s ts=%s", dest, ts_iso)
 
 
 def publish_p5(client: mqtt.Client, result: P5Result) -> None:
