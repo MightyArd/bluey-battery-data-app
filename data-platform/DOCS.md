@@ -9,7 +9,7 @@
 3. Ensure the Mosquitto broker add-on is running (this add-on requires MQTT).
 4. Start the add-on and check the log.
 
-## Current behaviour (v0.5.1)
+## Current behaviour (v0.5.2)
 
 Every 5 minutes (aligned to AEMO dispatch boundaries, +2 min offset):
 
@@ -86,7 +86,20 @@ RTE is the battery DC round-trip and excludes inverter conversion; full system
 AC-to-AC RTE is not available from these sensors.
 
 The `rclone` config is generated at runtime from the options below into
-`/data/rclone.conf` (SMB passwords obscured); no secrets are committed.
+`/data/rclone.conf` (SMB passwords obscured); no secrets are committed. The file is
+rewritten from the current options on every archive run, so it cannot go stale.
+
+### B2 push diagnostics (v0.5.2)
+
+When a B2 (cloud) destination is configured, each archive run logs a short
+diagnostic block before the upload to help localise cloud-side failures (for
+example an AccessDenied response): the key id, bucket, endpoint and destination
+path; a non-revealing fingerprint of the secret key (length, first four and last
+two characters, whitespace flag); the exact `rclone` copyto command; and the
+`/data/rclone.conf` contents. Secrets are never logged in plaintext: the secret key
+and the NAS password are always masked to `****`, and the secret key otherwise
+appears only as the fingerprint. This is diagnostic logging only; it changes no
+upload, verification, or path behaviour.
 
 ### Force backup button (v0.5.0)
 

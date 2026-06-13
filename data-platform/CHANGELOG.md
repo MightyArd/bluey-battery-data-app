@@ -1,5 +1,28 @@
 # Changelog
 
+## 0.5.2
+- Diagnostic-logging release: no behaviour change to upload, verification, path
+  building, the key, or anything else. Logging only.
+- When a B2 destination is configured, each archive run now INFO-logs, before the
+  upload, exactly what the add-on sends to B2, to localise the AccessDenied (403,
+  "not entitled") failures: the b2_key_id, b2_bucket, b2_endpoint and the
+  destination object path; a non-revealing fingerprint of the secret key (length,
+  first four and last two characters, and a leading/trailing whitespace flag); the
+  exact rclone copyto invocation; and the /data/rclone.conf path, whether it
+  existed before this run, and its contents.
+- No secret is ever logged in plaintext. The b2_key and the NAS password are
+  masked to **** in the config dump and the command, and the b2_key otherwise
+  appears only as the fingerprint. A new redaction helper enforces this.
+- Confirmed the rclone config file is rewritten from the current options on every
+  run, so a stale config baked from an earlier key cannot be reused; the log states
+  this explicitly per run.
+- Unit tests: the fingerprint can never contain the full secret (including a short
+  secret, where head and tail are also masked) and flags whitespace; the config
+  redactor masks secret_access_key and pass while keeping access_key_id, endpoint
+  and user; the secret-masking helper masks occurrences and is a no-op on empty
+  (5 cases).
+- Bumped version to 0.5.2; updated config.yaml, DOCS.md, and the device model.
+
 ## 0.5.1
 - Fix NAS backup verification, which failed a correct upload with "is a file not a
   directory". rclone check operates on directories, not file paths; it is now

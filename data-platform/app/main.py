@@ -1,6 +1,6 @@
 """Bluey Data Platform - entry point.
 
-v0.5.1: fix NAS single-file verification and the simulation InfluxDB reads.
+v0.5.2: add redacted B2 push diagnostic logging (no behaviour change).
 """
 from __future__ import annotations
 
@@ -27,7 +27,7 @@ if TYPE_CHECKING:
 log = logging.getLogger("bluey")
 
 _HEARTBEAT_TOPIC = "bluey/data_platform/heartbeat"
-_VERSION = "0.5.1"
+_VERSION = "0.5.2"
 
 _PERIOD_S = 300
 _CYCLE_OFFSET_S = 120

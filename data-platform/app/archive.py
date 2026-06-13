@@ -312,6 +312,95 @@ def write_rclone_config(settings: "Settings", config_path: Path) -> tuple[bool, 
     return nas_ok, b2_ok
 
 
+# --------------------------------------------------------------------------- #
+# Diagnostic logging helpers (v0.5.2). These never reveal a secret in plaintext:
+# the b2_key / nas_password only ever appear as a non-revealing fingerprint or
+# masked to ****.
+# --------------------------------------------------------------------------- #
+
+_REDACT_KEYS = {"secret_access_key", "pass"}
+
+
+def _fingerprint(secret: str) -> str:
+    """Non-revealing fingerprint of a secret for diagnostics.
+
+    Reports length, the first 4 and last 2 characters, and whether the value has
+    leading or trailing whitespace (a copy-paste anomaly). For a secret of 6
+    characters or fewer the head and tail are masked too, so the fingerprint can
+    never contain enough of the value to reconstruct it.
+    """
+    n = len(secret)
+    ws = "yes" if secret != secret.strip() else "no"
+    if n <= 6:
+        return f"len={n} head=**** tail=** ws={ws}"
+    return f"len={n} head={secret[:4]} tail={secret[-2:]} ws={ws}"
+
+
+def _redact_secret(text: str, secret: str) -> str:
+    """Mask any occurrence of `secret` in `text` with **** (no-op for empty secret)."""
+    return text.replace(secret, "****") if secret else text
+
+
+def _redact_rclone_config(text: str) -> str:
+    """Return rclone config text with secret values masked, safe to log.
+
+    The value of any `secret_access_key` or `pass` line becomes ****; every other
+    line (type, provider, endpoint, access_key_id, host, user) is kept in full.
+    """
+    out: list[str] = []
+    for line in text.splitlines():
+        if "=" in line:
+            key, _, _value = line.partition("=")
+            if key.strip() in _REDACT_KEYS:
+                out.append(f"{key.rstrip()} = ****")
+                continue
+        out.append(line)
+    return "\n".join(out)
+
+
+def _log_b2_diagnostics(
+    settings: "Settings",
+    remote: str,
+    local_path: Path,
+    config_path: Path,
+    config_existed: bool,
+) -> None:
+    """INFO-log what the add-on sends to B2, to localise the AccessDenied failure.
+
+    Diagnostic only: changes no behaviour. No secret is ever logged in plaintext.
+    The b2_key appears only as a fingerprint; the rclone config and command are
+    logged with secrets masked to ****.
+    """
+    dest_file = f"{remote}/{local_path.name}"
+    # 1. B2 parameters read from options at archive time (keyID is not a secret).
+    log.info(
+        "B2 diagnostic: key_id=%s bucket=%s endpoint=%s dest=%s",
+        settings.b2_key_id, settings.b2_bucket, settings.b2_endpoint, dest_file,
+    )
+    # 2. Non-revealing fingerprint of the secret (length/head/tail/whitespace).
+    log.info("B2 diagnostic: b2_key %s", _fingerprint(settings.b2_key))
+    # 3. The exact rclone copyto invocation (the secret lives in the config file,
+    #    not on the command line, so this argv carries none; masked defensively).
+    argv = ["rclone", "--config", str(config_path), "copyto", str(local_path), dest_file]
+    log.info(
+        "B2 diagnostic: rclone copyto argv: %s",
+        _redact_secret(" ".join(argv), settings.b2_key),
+    )
+    # 4. The rclone config FILE: path, reuse status, and its redacted contents. The
+    #    file is rewritten from current options every run, so it cannot be stale.
+    status = "existed before this run" if config_existed else "did not exist before this run"
+    log.info(
+        "B2 diagnostic: rclone config file %s (%s; rewritten from current options this run)",
+        config_path, status,
+    )
+    try:
+        redacted = _redact_rclone_config(config_path.read_text())
+    except Exception as exc:
+        log.warning("B2 diagnostic: could not read rclone config for logging: %s", exc)
+        return
+    log.info("B2 diagnostic: rclone config (secrets masked):\n%s", redacted)
+
+
 def _remote_join(base: str, *segments: str) -> str:
     """Join an rclone remote base ("nas:share" or "b2:bucket") with path segments.
 
@@ -385,6 +474,7 @@ def run_archive(client: "mqtt.Client", settings: "Settings", day: date | None = 
         return
 
     config_path = Path(settings.data_dir) / "rclone.conf"
+    config_existed = config_path.exists()  # captured before the config is (re)written
     nas_ok, b2_ok = write_rclone_config(settings, config_path)
     part = partition_path(day)
 
@@ -400,6 +490,7 @@ def run_archive(client: "mqtt.Client", settings: "Settings", day: date | None = 
 
     if b2_ok:
         remote = _remote_join(f"b2:{settings.b2_bucket}", settings.nas_path, part)
+        _log_b2_diagnostics(settings, remote, parquet_path, config_path, config_existed)
         try:
             if push_verified(parquet_path, remote, config_path):
                 publisher.publish_backup_health(client, "cloud", _now_iso(settings))

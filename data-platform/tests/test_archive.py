@@ -253,3 +253,51 @@ class TestPushVerified:
 
         assert push_verified(local, "nas:share/2026/06", tmp_path / "c.conf") is False
         assert len(rec.calls) == 2
+
+
+class TestB2DiagnosticRedaction:
+    # A realistic B2 application key: 31 chars, like the live "...004" key.
+    SECRET = "K004abcdefghijklmnopqrstuvwxy8o"
+
+    def test_fingerprint_never_contains_full_secret(self):
+        fp = archive._fingerprint(self.SECRET)
+        assert self.SECRET not in fp
+        assert f"len={len(self.SECRET)}" in fp
+        assert "head=K004" in fp
+        assert "tail=8o" in fp
+        assert "ws=no" in fp
+
+    def test_fingerprint_flags_leading_or_trailing_whitespace(self):
+        assert "ws=yes" in archive._fingerprint("  paddedsecretvalue  ")
+        assert "ws=no" in archive._fingerprint("cleansecretvalue")
+
+    def test_fingerprint_masks_short_secret_entirely(self):
+        # head+tail of a short secret could reconstruct it, so both are masked.
+        secret = "abc123"
+        fp = archive._fingerprint(secret)
+        assert secret not in fp
+        assert "len=6" in fp
+        assert "head=****" in fp
+
+    def test_redact_rclone_config_masks_secrets_keeps_metadata(self):
+        cfg = (
+            "[b2]\ntype = s3\nprovider = Other\n"
+            "access_key_id = K004publicidvalue\n"
+            f"secret_access_key = {self.SECRET}\n"
+            "endpoint = s3.us-west-004.backblazeb2.com\n\n"
+            "[nas]\ntype = smb\nuser = backup\npass = OBSCUREDNASPASS\n"
+        )
+        red = archive._redact_rclone_config(cfg)
+        # both secrets gone, masked
+        assert self.SECRET not in red
+        assert "OBSCUREDNASPASS" not in red
+        assert "secret_access_key = ****" in red
+        assert "pass = ****" in red
+        # non-secret metadata preserved in full
+        assert "access_key_id = K004publicidvalue" in red
+        assert "endpoint = s3.us-west-004.backblazeb2.com" in red
+        assert "user = backup" in red
+
+    def test_redact_secret_masks_occurrences_and_noop_on_empty(self):
+        assert archive._redact_secret(f"copyto x {self.SECRET}", self.SECRET) == "copyto x ****"
+        assert archive._redact_secret("nothing to mask", "") == "nothing to mask"
