@@ -1,5 +1,5 @@
 name: Bluey Data Platform
-version: "0.5.0"
+version: "0.5.1"
 slug: data_platform
 description: P5 ingestion, battery dispatch simulation, and 5-minute archive for Bluey.
 url: https://github.com/MightyArd/bluey-battery-data-app

@@ -40,6 +40,23 @@ def read_soc(soc_entity: str, supervisor_token: str) -> float | None:
         return None
 
 
+def _mean_query(oid: str, start: datetime, stop: datetime) -> str:
+    """Flux for the mean of one entity over a UTC window, forward-filled.
+
+    The `_field == "value"` filter restricts the aggregate to the numeric state
+    column. HA logs several fields per entity (the numeric `value` plus string
+    attribute fields), so without it mean() hits a string column and errors.
+    """
+    return (
+        f'from(bucket: "{_INFLUX_BUCKET}")'
+        f'  |> range(start: {start.strftime("%Y-%m-%dT%H:%M:%SZ")},'
+        f'            stop:  {stop.strftime("%Y-%m-%dT%H:%M:%SZ")})'
+        f'  |> filter(fn: (r) => r["entity_id"] == "{oid}" and r["_field"] == "value")'
+        f'  |> fill(usePrevious: true)'
+        f'  |> mean()'
+    )
+
+
 def _flux_mean(
     influx_token: str,
     entity_id: str,
@@ -50,14 +67,7 @@ def _flux_mean(
     from influxdb_client import InfluxDBClient  # type: ignore[import]
 
     oid = _object_id(entity_id)
-    q = (
-        f'from(bucket: "{_INFLUX_BUCKET}")'
-        f'  |> range(start: {start.strftime("%Y-%m-%dT%H:%M:%SZ")},'
-        f'            stop:  {stop.strftime("%Y-%m-%dT%H:%M:%SZ")})'
-        f'  |> filter(fn: (r) => r["entity_id"] == "{oid}")'
-        f'  |> fill(usePrevious: true)'
-        f'  |> mean()'
-    )
+    q = _mean_query(oid, start, stop)
     try:
         with InfluxDBClient(url=_INFLUX_URL, token=influx_token, org=_INFLUX_ORG) as c:
             for table in c.query_api().query(q):
@@ -88,6 +98,21 @@ def read_period_actuals(
     return solar, load
 
 
+def _profile_query(oid: str, days: int) -> str:
+    """Flux for the trailing-`days` 5-minute mean profile of one entity.
+
+    Same `_field == "value"` restriction as `_mean_query`: aggregateWindow(fn: mean)
+    must see only the numeric value column, not the string attribute fields.
+    """
+    return (
+        f'from(bucket: "{_INFLUX_BUCKET}")'
+        f'  |> range(start: -{days}d)'
+        f'  |> filter(fn: (r) => r["entity_id"] == "{oid}" and r["_field"] == "value")'
+        f'  |> aggregateWindow(every: 5m, fn: mean, createEmpty: false)'
+        f'  |> fill(usePrevious: true)'
+    )
+
+
 def _flux_profile(
     influx_token: str,
     entity_id: str,
@@ -98,13 +123,7 @@ def _flux_profile(
     from influxdb_client import InfluxDBClient  # type: ignore[import]
 
     oid = _object_id(entity_id)
-    q = (
-        f'from(bucket: "{_INFLUX_BUCKET}")'
-        f'  |> range(start: -{days}d)'
-        f'  |> filter(fn: (r) => r["entity_id"] == "{oid}")'
-        f'  |> aggregateWindow(every: 5m, fn: mean, createEmpty: false)'
-        f'  |> fill(usePrevious: true)'
-    )
+    q = _profile_query(oid, days)
     acc: dict[int, list[float]] = defaultdict(list)
     try:
         with InfluxDBClient(url=_INFLUX_URL, token=influx_token, org=_INFLUX_ORG) as c:

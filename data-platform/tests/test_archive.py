@@ -5,11 +5,13 @@ from datetime import date, datetime, timedelta, timezone
 
 import pytest
 
+from app import archive
 from app.archive import (
     build_specs,
     daily_filename,
     day_bounds,
     partition_path,
+    push_verified,
     rollup_series,
     split_grid_power,
     time_buckets,
@@ -171,3 +173,83 @@ class TestSpecsAndNaming:
         d = date(2026, 6, 9)
         assert daily_filename(d) == "energy_5min_2026-06-09.parquet"
         assert partition_path(d) == "2026/06"
+
+
+class TestRemoteJoin:
+    def test_empty_nas_path_produces_no_double_slash(self):
+        # The live defect: nas_path empty gave nas:energy-archive//2026/06.
+        assert (
+            archive._remote_join("nas:energy-archive", "", "2026/06")
+            == "nas:energy-archive/2026/06"
+        )
+
+    def test_set_nas_path_joins_with_single_slashes(self):
+        assert (
+            archive._remote_join("nas:share", "energy-archive", "2026/06")
+            == "nas:share/energy-archive/2026/06"
+        )
+
+    def test_stray_slashes_on_segments_are_stripped(self):
+        assert (
+            archive._remote_join("b2:bucket", "/energy-archive/", "2026/06")
+            == "b2:bucket/energy-archive/2026/06"
+        )
+
+
+class _RcloneRecorder:
+    """Stand-in for archive._rclone: records each arg list and returns scripted results."""
+
+    def __init__(self, results: list[bool]):
+        self.calls: list[list[str]] = []
+        self._results = iter(results)
+
+    def __call__(self, args, config_path):
+        self.calls.append(args)
+        return next(self._results)
+
+
+class TestPushVerified:
+    def _local(self, tmp_path):
+        f = tmp_path / "energy_5min_2026-06-12.parquet"
+        f.write_text("parquet-bytes")
+        return f
+
+    def test_verify_targets_directory_plus_include_not_bare_file(self, monkeypatch, tmp_path):
+        rec = _RcloneRecorder([True, True])  # copy ok, verify ok
+        monkeypatch.setattr(archive, "_rclone", rec)
+        local = self._local(tmp_path)
+        remote = "nas:energy-archive/2026/06"
+
+        assert push_verified(local, remote, tmp_path / "rclone.conf") is True
+        assert len(rec.calls) == 2
+
+        copy_args = rec.calls[0]
+        assert copy_args[0] == "copyto"
+        assert copy_args[-1] == f"{remote}/{local.name}"
+
+        verify_args = rec.calls[1]
+        assert verify_args[0] == "check"
+        assert "--download" in verify_args        # SMB has no server-side hash
+        assert "--one-way" in verify_args          # ignore other files at the remote
+        assert "--include" in verify_args
+        assert local.name in verify_args           # restricted to the single file
+        assert str(local.parent) in verify_args    # local dir, not the file path
+        assert remote in verify_args               # remote dir, not the file path
+        # the bare remote file path must NOT be a check argument (the old bug)
+        assert f"{remote}/{local.name}" not in verify_args
+
+    def test_failed_upload_does_not_attempt_verification(self, monkeypatch, tmp_path):
+        rec = _RcloneRecorder([False])  # copy fails
+        monkeypatch.setattr(archive, "_rclone", rec)
+        local = self._local(tmp_path)
+
+        assert push_verified(local, "nas:share/2026/06", tmp_path / "c.conf") is False
+        assert len(rec.calls) == 1  # no verify after a failed copy
+
+    def test_verification_failure_returns_false(self, monkeypatch, tmp_path):
+        rec = _RcloneRecorder([True, False])  # copy ok, verify fails
+        monkeypatch.setattr(archive, "_rclone", rec)
+        local = self._local(tmp_path)
+
+        assert push_verified(local, "nas:share/2026/06", tmp_path / "c.conf") is False
+        assert len(rec.calls) == 2

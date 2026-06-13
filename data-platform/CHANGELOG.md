@@ -1,5 +1,31 @@
 # Changelog
 
+## 0.5.1
+- Fix NAS backup verification, which failed a correct upload with "is a file not a
+  directory". rclone check operates on directories, not file paths; it is now
+  pointed at the local staging directory and the remote directory with the file
+  name included (--include) and --download, so the single uploaded file is hash
+  compared on SMB (no server-side hash) and B2 alike. A present, matching file no
+  longer reports as a verification failure, and the per-destination health
+  timestamps still update only on a genuinely verified push.
+- Fix the remote path so an empty nas_path no longer produces a double slash
+  (energy-archive//2026/06). Segments are joined dropping empties, yielding
+  energy-archive/2026/06. The same correction applies to both the NAS and B2 legs;
+  the one-destination-fails-without-stopping-the-other behaviour is preserved.
+- Fix the simulation InfluxDB reads, which errored with "mean: unsupported
+  aggregate column type string" and left the simulation running on solar=0W,
+  load=0W and a broken reserve profile. Both simulation reads in sources.py (the
+  previous-period actuals mean and the trailing 7-day load/solar profile) now
+  filter _field == "value" before mean(), so only the numeric state column is
+  aggregated, not the string attribute fields HA also logs. The daily archive
+  reads already filtered _field == "value" and are unchanged.
+- No behaviour change to the daily timer, the force-backup button, the simulation
+  logic, or the archive variable selection and rollup rules.
+- Unit tests: simulation query builders include the _field filter; the remote-path
+  builder drops empty segments (no double slash); the verification invocation uses
+  the directory-plus-include form, not a bare file path (12 cases).
+- Bumped version to 0.5.1; updated config.yaml, DOCS.md, and the device model.
+
 ## 0.5.0
 - Force-backup button: a momentary MQTT button entity
   (button.bluey_data_platform_run_archive, friendly name "Force backup") under the

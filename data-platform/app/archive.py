@@ -312,20 +312,49 @@ def write_rclone_config(settings: "Settings", config_path: Path) -> tuple[bool, 
     return nas_ok, b2_ok
 
 
-def push_verified(local_path: Path, remote: str, config_path: Path) -> bool:
-    """Copy one file to a remote and verify it by checksum.
+def _remote_join(base: str, *segments: str) -> str:
+    """Join an rclone remote base ("nas:share" or "b2:bucket") with path segments.
 
-    `remote` is a full rclone destination directory, e.g. "nas:share/energy-archive/2026/06"
-    or "b2:bucket/energy-archive/2026/06". Verification downloads the remote copy and
-    compares its hash to the local file, which works for every backend including SMB
-    (which has no server-side hash).
+    Empty segments are dropped, so an unset nas_path yields "nas:share/2026/06"
+    rather than "nas:share//2026/06". The double slash made SMB reject the path
+    ("is a file not a directory") during verification.
+    """
+    parts = [base.rstrip("/")]
+    for seg in segments:
+        cleaned = seg.strip("/")
+        if cleaned:
+            parts.append(cleaned)
+    return "/".join(parts)
+
+
+def push_verified(local_path: Path, remote: str, config_path: Path) -> bool:
+    """Copy one file to a remote directory and verify it by checksum.
+
+    `remote` is the rclone destination directory, e.g. "nas:share/energy-archive/2026/06"
+    or "b2:bucket/energy-archive/2026/06". The file is copied in, then verified by
+    comparing the local staging directory against the remote directory, restricted to
+    this one file with --include.
+
+    rclone check operates on directories, not file paths: pointing it at a full remote
+    file path fails on SMB with "is a file not a directory". --include narrows the
+    check to the single file, --download fetches the remote copy and compares byte
+    hashes (works for SMB, which has no server-side hash, and for S3/B2 alike), and
+    --one-way ignores other files already present at the remote.
     """
     dest_file = f"{remote}/{local_path.name}"
     if not _rclone(["copyto", str(local_path), dest_file], config_path):
         return False
-    # --download compares byte hashes; --one-way ignores extra files at the remote.
     if not _rclone(
-        ["check", "--one-way", "--download", str(local_path), dest_file], config_path
+        [
+            "check",
+            "--one-way",
+            "--download",
+            "--include",
+            local_path.name,
+            str(local_path.parent),
+            remote,
+        ],
+        config_path,
     ):
         log.error("Checksum verification failed for %s", dest_file)
         return False
@@ -360,7 +389,7 @@ def run_archive(client: "mqtt.Client", settings: "Settings", day: date | None = 
     part = partition_path(day)
 
     if nas_ok:
-        remote = f"nas:{settings.nas_share}/{settings.nas_path}/{part}"
+        remote = _remote_join(f"nas:{settings.nas_share}", settings.nas_path, part)
         try:
             if push_verified(parquet_path, remote, config_path):
                 publisher.publish_backup_health(client, "nas", _now_iso(settings))
@@ -370,7 +399,7 @@ def run_archive(client: "mqtt.Client", settings: "Settings", day: date | None = 
         log.warning("NAS destination not configured; skipping NAS push")
 
     if b2_ok:
-        remote = f"b2:{settings.b2_bucket}/{settings.nas_path}/{part}"
+        remote = _remote_join(f"b2:{settings.b2_bucket}", settings.nas_path, part)
         try:
             if push_verified(parquet_path, remote, config_path):
                 publisher.publish_backup_health(client, "cloud", _now_iso(settings))

@@ -9,7 +9,7 @@
 3. Ensure the Mosquitto broker add-on is running (this add-on requires MQTT).
 4. Start the add-on and check the log.
 
-## Current behaviour (v0.5.0)
+## Current behaviour (v0.5.1)
 
 Every 5 minutes (aligned to AEMO dispatch boundaries, +2 min offset):
 
@@ -64,7 +64,9 @@ previous full local day:
    sensors that sit flat (grid power in particular) leave no gaps.
 3. Writes a Parquet file `energy_5min_YYYY-MM-DD.parquet` to `/data/archive/`.
 4. Pushes it to the Synology NAS (SMB) and Backblaze B2 (S3 backend) with `rclone`,
-   each verified by a downloaded-checksum comparison after transfer.
+   each verified after transfer by a downloaded-checksum comparison of the single
+   uploaded file (the remote directory is checked with the file name included, so
+   the comparison works on SMB, which has no server-side hash, as well as B2).
 5. Publishes `sensor.bluey_data_platform_backup_nas_last_success` and
    `..._backup_cloud_last_success` timestamps, set only after a verified push.
 
@@ -135,7 +137,7 @@ not in this add-on.
 | `archive_time` | 00:30 | Local time, HH:MM, for the daily archive run |
 | `nas_host` | 192.168.50.214 | Synology SMB host |
 | `nas_share` | (empty) | SMB share name; NAS push is skipped when empty |
-| `nas_path` | energy-archive | Target folder within the share (also the B2 key prefix) |
+| `nas_path` | energy-archive | Target folder within the share (also the B2 key prefix); may be left empty to write to the share root |
 | `nas_user` | (empty) | SMB username |
 | `nas_password` | (empty) | SMB password (obscured into /data/rclone.conf) |
 | `b2_bucket` | (empty) | Backblaze B2 bucket; cloud push is skipped when empty |
