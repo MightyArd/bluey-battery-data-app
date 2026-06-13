@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.4.1
+- Corrected the archived energy-counter selections (no behaviour change otherwise):
+  - Battery RTE inputs now use the cumulative lifetime counters
+    goodwe_total_battery_charge and goodwe_total_battery_discharge (last), replacing
+    the kWh-measurement auto-discovery, which could not match these names. RTE is
+    therefore computable from deltas over any multi-day window. These are DC-terminal
+    counters, so the derived RTE is the battery DC round-trip and excludes inverter
+    conversion; AC-to-AC RTE is not available from these sensors.
+  - Grid energy now uses the grid-meter counters goodwe_meter_total_energy_import and
+    goodwe_meter_total_energy_export (matching goodwe_meter_active_power_total), not
+    the inverter-side goodwe_total_energy_* nor the second meter goodwe_meter_2_*.
+  - PV generation now uses goodwe_total_pv_generation.
+  - goodwe_total_load, ev_energy_shelly_total and non_ev_load_energy_total unchanged.
+- Removed the now-unused kWh-measurement RTE discovery from sources.py.
+
 ## 0.4.0
 - Daily archive: once a day (default 00:30 local) query InfluxDB for the previous
   full local day, roll up to 5-minute resolution, write Parquet, and push the file

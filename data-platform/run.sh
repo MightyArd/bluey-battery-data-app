@@ -32,5 +32,5 @@ export B2_KEY_ID="$(bashio::config 'b2_key_id')"
 export B2_KEY="$(bashio::config 'b2_key')"
 export B2_ENDPOINT="$(bashio::config 'b2_endpoint')"
 
-bashio::log.info "Starting Bluey Data Platform v0.4.0 (MQTT ${MQTT_HOST}:${MQTT_PORT})"
+bashio::log.info "Starting Bluey Data Platform v0.4.1 (MQTT ${MQTT_HOST}:${MQTT_PORT})"
 exec python3 -m app.main

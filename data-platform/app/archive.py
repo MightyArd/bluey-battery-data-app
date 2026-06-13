@@ -58,13 +58,22 @@ MEASURED_SPECS: tuple[VarSpec, ...] = (
     VarSpec("battery_soc", "goodwe_battery_soc", "mean"),
     # Categorical, last
     VarSpec("goodwe_battery_mode", "goodwe_battery_mode", "last"),
-    # Energy counters, last (import and export kept split, never netted)
-    VarSpec("grid_import_energy", "grid_import_energy", "last"),
-    VarSpec("grid_export_energy", "grid_export_energy", "last"),
+    # Energy counters, last (import and export kept split, never netted). Grid energy
+    # uses the grid-meter counters that match goodwe_meter_active_power_total, NOT the
+    # inverter-side goodwe_total_energy_* nor the second meter (goodwe_meter_2_*).
+    VarSpec("grid_import_energy", "goodwe_meter_total_energy_import", "last"),
+    VarSpec("grid_export_energy", "goodwe_meter_total_energy_export", "last"),
     VarSpec("goodwe_total_load", "goodwe_total_load", "last"),
-    VarSpec("pv_generation", "pv_generation", "last"),
+    VarSpec("goodwe_total_pv_generation", "goodwe_total_pv_generation", "last"),
     VarSpec("ev_energy_shelly_total", "ev_energy_shelly_total", "last"),
     VarSpec("non_ev_load_energy_total", "non_ev_load_energy_total", "last"),
+    # Battery round-trip-efficiency inputs: cumulative LIFETIME counters (not the
+    # daily-reset goodwe_today_* ones), so RTE is computable from deltas over any
+    # multi-day window. These are measured at the battery DC terminals, so the
+    # derived RTE is the battery DC round-trip and excludes inverter conversion;
+    # full system AC-to-AC RTE is not available from these sensors.
+    VarSpec("goodwe_total_battery_charge", "goodwe_total_battery_charge", "last"),
+    VarSpec("goodwe_total_battery_discharge", "goodwe_total_battery_discharge", "last"),
 )
 
 # App entities (published by this add-on via MQTT discovery). These object_ids match
@@ -79,15 +88,9 @@ APP_SPECS: tuple[VarSpec, ...] = (
 )
 
 
-def build_specs(rte_counters: list[str]) -> list[VarSpec]:
-    """Assemble the full column spec, appending any discovered RTE counters (last).
-
-    RTE counters are included only when present; absence leaves the schema clean.
-    """
-    specs = list(MEASURED_SPECS) + list(APP_SPECS)
-    for name in rte_counters:
-        specs.append(VarSpec(name, name, "last"))
-    return specs
+def build_specs() -> list[VarSpec]:
+    """Assemble the full archive column spec (measured + battery RTE + app entities)."""
+    return list(MEASURED_SPECS) + list(APP_SPECS)
 
 
 def day_bounds(day: date, tz_name: str) -> tuple[datetime, datetime]:
@@ -215,12 +218,7 @@ def build_day_parquet(settings: "Settings", day: date, out_dir: Path) -> tuple[P
     start_utc, stop_utc = day_bounds(day, settings.timezone)
     buckets = time_buckets(start_utc, stop_utc)
 
-    rte = sources.discover_rte_counters(settings.influxdb_token)
-    if rte:
-        log.info("RTE energy counters found: %s", ", ".join(rte))
-    else:
-        log.info("No battery charge/discharge energy counters found in kWh measurement")
-    specs = build_specs(rte)
+    specs = build_specs()
 
     columns: dict[str, list[Value | None]] = {}
 

@@ -115,18 +115,36 @@ class TestGridSplit:
 
 
 class TestSpecsAndNaming:
-    def test_rte_counters_included_when_present(self):
-        specs = build_specs(["goodwe_battery_charge_energy", "goodwe_battery_discharge_energy"])
-        cols = [s.column for s in specs]
-        assert "goodwe_battery_charge_energy" in cols
-        assert "goodwe_battery_discharge_energy" in cols
-        assert all(s.agg == "last" for s in specs if "energy" in s.column)
+    def _spec(self, column: str):
+        return next(s for s in build_specs() if s.column == column)
 
-    def test_rte_counters_omitted_when_absent(self):
-        with_rte = build_specs(["goodwe_battery_charge_energy"])
-        without = build_specs([])
-        assert len(with_rte) == len(without) + 1
-        assert "goodwe_battery_charge_energy" not in [s.column for s in without]
+    def test_battery_rte_uses_lifetime_counters_as_last(self):
+        charge = self._spec("goodwe_total_battery_charge")
+        discharge = self._spec("goodwe_total_battery_discharge")
+        assert charge.entity_id == "goodwe_total_battery_charge"
+        assert discharge.entity_id == "goodwe_total_battery_discharge"
+        assert charge.agg == "last" and discharge.agg == "last"
+
+    def test_grid_energy_uses_grid_meter_counters(self):
+        assert self._spec("grid_import_energy").entity_id == "goodwe_meter_total_energy_import"
+        assert self._spec("grid_export_energy").entity_id == "goodwe_meter_total_energy_export"
+        assert self._spec("grid_import_energy").agg == "last"
+        assert self._spec("grid_export_energy").agg == "last"
+
+    def test_pv_generation_uses_total_counter(self):
+        spec = self._spec("goodwe_total_pv_generation")
+        assert spec.entity_id == "goodwe_total_pv_generation"
+        assert spec.agg == "last"
+
+    def test_remaining_energy_counters_exact(self):
+        cols = {s.column for s in build_specs()}
+        for name in ("goodwe_total_load", "ev_energy_shelly_total", "non_ev_load_energy_total"):
+            assert name in cols
+        # inverter-side and second-meter counters must not be archived
+        entities = {s.entity_id for s in build_specs()}
+        assert "goodwe_total_energy_import" not in entities
+        assert "goodwe_total_energy_export" not in entities
+        assert not any(e.startswith("goodwe_meter_2_") for e in entities)
 
     def test_filename_and_partition(self):
         d = date(2026, 6, 9)

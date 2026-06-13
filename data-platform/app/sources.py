@@ -188,33 +188,3 @@ def read_raw_series(
         return []
     records.sort(key=lambda r: r[0])
     return records
-
-
-def discover_rte_counters(influx_token: str) -> list[str]:
-    """Find battery charge/discharge energy counters in the kWh measurement.
-
-    Returns the matching entity_id tag values (object_ids), or an empty list if
-    none exist or InfluxDB is unreachable. Never synthesises counters.
-    """
-    from influxdb_client import InfluxDBClient  # type: ignore[import]
-
-    q = (
-        'import "influxdata/influxdb/schema"\n'
-        f'schema.measurementTagValues(bucket: "{_INFLUX_BUCKET}", '
-        f'measurement: "kWh", tag: "entity_id")'
-    )
-    out: list[str] = []
-    try:
-        with InfluxDBClient(url=_INFLUX_URL, token=influx_token, org=_INFLUX_ORG) as c:
-            for table in c.query_api().query(q):
-                for rec in table.records:
-                    name = str(rec.get_value())
-                    low = name.lower()
-                    if "battery" in low and "energy" in low and (
-                        "charge" in low or "discharge" in low
-                    ):
-                        out.append(name)
-    except Exception as exc:
-        log.warning("InfluxDB RTE counter discovery failed: %s", exc)
-        return []
-    return sorted(set(out))

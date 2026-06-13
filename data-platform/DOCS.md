@@ -9,7 +9,7 @@
 3. Ensure the Mosquitto broker add-on is running (this add-on requires MQTT).
 4. Start the add-on and check the log.
 
-## Current behaviour (v0.4.0)
+## Current behaviour (v0.4.1)
 
 Every 5 minutes (aligned to AEMO dispatch boundaries, +2 min offset):
 
@@ -72,8 +72,16 @@ Destinations are independent: if one fails (for example B2 is not yet configured
 the other still completes and reports, and the loop never crashes. The cloud leg is
 skipped silently until the B2 options are set. Grid power is archived as separate
 `grid_import_power` and `grid_export_power` columns, derived from the signed grid
-meter. Battery round-trip-efficiency energy counters are auto-detected in the `kWh`
-measurement and included when present.
+meter. Grid energy is taken from the grid-meter counters
+(`goodwe_meter_total_energy_import` and `_export`), which match the signed grid
+power sensor, not the inverter-side or second-meter counters.
+
+Battery round-trip-efficiency inputs are the cumulative lifetime counters
+`goodwe_total_battery_charge` and `goodwe_total_battery_discharge` (not the
+daily-reset `today_` counters), so RTE is computable from deltas over any
+multi-day window. These are measured at the battery DC terminals, so the derived
+RTE is the battery DC round-trip and excludes inverter conversion; full system
+AC-to-AC RTE is not available from these sensors.
 
 The `rclone` config is generated at runtime from the options below into
 `/data/rclone.conf` (SMB passwords obscured); no secrets are committed.

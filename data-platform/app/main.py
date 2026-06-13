@@ -20,7 +20,7 @@ from . import simulator
 from .settings import load as load_settings
 
 _HEARTBEAT_TOPIC = "bluey/data_platform/heartbeat"
-_VERSION = "0.4.0"
+_VERSION = "0.4.1"
 
 _PERIOD_S = 300
 _CYCLE_OFFSET_S = 120
