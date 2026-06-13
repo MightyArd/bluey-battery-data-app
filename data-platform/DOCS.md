@@ -9,7 +9,7 @@
 3. Ensure the Mosquitto broker add-on is running (this add-on requires MQTT).
 4. Start the add-on and check the log.
 
-## Current behaviour (v0.5.2)
+## Current behaviour (v0.5.3)
 
 Every 5 minutes (aligned to AEMO dispatch boundaries, +2 min offset):
 
@@ -87,7 +87,11 @@ AC-to-AC RTE is not available from these sensors.
 
 The `rclone` config is generated at runtime from the options below into
 `/data/rclone.conf` (SMB passwords obscured); no secrets are committed. The file is
-rewritten from the current options on every archive run, so it cannot go stale.
+rewritten from the current options on every archive run, so it cannot go stale. The
+`[b2]` S3 remote is written with `no_check_bucket = true` so that a B2 application
+key scoped to a single bucket (no bucket-create or list-all-buckets entitlement)
+can upload without rclone's pre-upload bucket check returning a 403. The `[nas]`
+(SMB) remote has no bucket concept and is unaffected.
 
 ### B2 push diagnostics (v0.5.2)
 

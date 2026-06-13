@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from datetime import date, datetime, timedelta, timezone
+from types import SimpleNamespace
 
 import pytest
 
@@ -301,3 +302,38 @@ class TestB2DiagnosticRedaction:
     def test_redact_secret_masks_occurrences_and_noop_on_empty(self):
         assert archive._redact_secret(f"copyto x {self.SECRET}", self.SECRET) == "copyto x ****"
         assert archive._redact_secret("nothing to mask", "") == "nothing to mask"
+
+
+class TestRcloneConfig:
+    def _settings(self):
+        # Only the fields write_rclone_config reads; both destinations configured.
+        return SimpleNamespace(
+            nas_host="192.168.50.214",
+            nas_share="energy-archive",
+            nas_user="backup",
+            nas_password="naspw",
+            b2_bucket="bluey-energy-archive",
+            b2_key_id="K004keyid",
+            b2_key="K004secretvalue",
+            b2_endpoint="s3.us-west-004.backblazeb2.com",
+        )
+
+    def test_b2_section_has_no_check_bucket_and_nas_does_not(self, monkeypatch, tmp_path):
+        # Avoid the real rclone obscure subprocess; the obscured value is irrelevant here.
+        monkeypatch.setattr(archive, "_obscure", lambda config_path, secret: "OBSCURED")
+        cfg_path = tmp_path / "rclone.conf"
+
+        nas_ok, b2_ok = archive.write_rclone_config(self._settings(), cfg_path)
+        assert nas_ok and b2_ok
+
+        text = cfg_path.read_text()
+        # [nas] is written before [b2], so everything before the [b2] header is the
+        # NAS section and everything from it onward is the B2 section.
+        b2_idx = text.index("[b2]")
+        nas_section, b2_section = text[:b2_idx], text[b2_idx:]
+
+        assert "no_check_bucket = true" in b2_section  # the fix
+        assert "no_check_bucket" not in nas_section     # SMB has no bucket concept
+        # the existing B2 fields are still present and unaffected
+        assert "type = s3" in b2_section
+        assert "access_key_id = K004keyid" in b2_section

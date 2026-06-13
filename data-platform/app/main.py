@@ -1,6 +1,6 @@
 """Bluey Data Platform - entry point.
 
-v0.5.2: add redacted B2 push diagnostic logging (no behaviour change).
+v0.5.3: set no_check_bucket on the B2 remote so a bucket-restricted key can upload.
 """
 from __future__ import annotations
 
@@ -27,7 +27,7 @@ if TYPE_CHECKING:
 log = logging.getLogger("bluey")
 
 _HEARTBEAT_TOPIC = "bluey/data_platform/heartbeat"
-_VERSION = "0.5.2"
+_VERSION = "0.5.3"
 
 _PERIOD_S = 300
 _CYCLE_OFFSET_S = 120

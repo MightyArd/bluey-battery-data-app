@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.5.3
+- Fix the B2 (cloud) upload, which failed every run with 403 AccessDenied ("not
+  entitled") at "failed to prepare upload" despite correct, uncorrupted
+  credentials (confirmed by the v0.5.2 diagnostics). The cause was rclone's S3
+  backend running a bucket existence/creation check before the upload; a B2
+  application key restricted to a single bucket has no bucket-create or
+  list-all-buckets entitlement, so that check returned 403. The SMB (NAS) backend
+  has no bucket concept, which is why only the cloud leg failed.
+- write_rclone_config now writes no_check_bucket = true in the [b2] S3 section
+  (rclone's documented remedy for keys without bucket-creation permission). The
+  [nas] section is unchanged. No other behaviour changes.
+- The v0.5.2 diagnostic logging is kept for this run, so the config dump will show
+  no_check_bucket = true under [b2] and confirm the upload now succeeds; a later
+  patch can trim the diagnostics once B2 is green.
+- Unit test: the generated [b2] section contains no_check_bucket = true and the
+  [nas] section does not.
+- Bumped version to 0.5.3; updated config.yaml, DOCS.md, and the device model.
+
 ## 0.5.2
 - Diagnostic-logging release: no behaviour change to upload, verification, path
   building, the key, or anything else. Logging only.

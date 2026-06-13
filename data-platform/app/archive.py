@@ -299,6 +299,11 @@ def write_rclone_config(settings: "Settings", config_path: Path) -> tuple[bool, 
 
     b2_ok = bool(settings.b2_bucket and settings.b2_key_id and settings.b2_key and settings.b2_endpoint)
     if b2_ok:
+        # no_check_bucket skips the pre-upload bucket existence/creation check. A
+        # B2 application key restricted to a single bucket has no create or
+        # list-all-buckets entitlement, so that check returns 403 "not entitled";
+        # skipping it is rclone's documented remedy. The [nas] (SMB) remote has no
+        # bucket concept, so this applies to [b2] only.
         sections.append(
             "[b2]\n"
             "type = s3\n"
@@ -306,6 +311,7 @@ def write_rclone_config(settings: "Settings", config_path: Path) -> tuple[bool, 
             f"access_key_id = {settings.b2_key_id}\n"
             f"secret_access_key = {settings.b2_key}\n"
             f"endpoint = {settings.b2_endpoint}\n"
+            "no_check_bucket = true\n"
         )
 
     config_path.write_text("\n".join(sections))
